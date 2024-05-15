@@ -11,7 +11,7 @@ export const createCard = async (req: Request, res: Response) => {
     return res.status(constants.HTTP_STATUS_CREATED).send(card);
   } catch (error) {
     if (error instanceof MongooseError.ValidationError) {
-      return res.status(constants.HTTP_STATUS_BAD_REQUEST).send({ message: 'Переданы не валидные данные для создания пользователя' });
+      return res.status(constants.HTTP_STATUS_BAD_REQUEST).send({ message: 'Переданы не валидные данные для создания карточки' });
     }
     return res.status(constants.HTTP_STATUS_INTERNAL_SERVER_ERROR).send({ message: 'Произошла ошибка' });
   }
@@ -62,6 +62,9 @@ export const likeCard = async (req: Request, res: Response) => {
     });
     return res.send(card);
   } catch (error) {
+    if (error instanceof MongooseError.ValidationError) {
+      return res.status(constants.HTTP_STATUS_BAD_REQUEST).send({ message: 'Переданы не валидные данные для лайка' });
+    }
     if (error instanceof Error && error.name === 'NotFoundError') {
       return res.status(constants.HTTP_STATUS_NOT_FOUND).send({ message: 'Произошла ошибка' });
     }
@@ -82,6 +85,9 @@ export const dislikeCard = async (req: Request, res: Response) => {
     });
     return res.send(card);
   } catch (error) {
+    if (error instanceof MongooseError.ValidationError) {
+      return res.status(constants.HTTP_STATUS_BAD_REQUEST).send({ message: 'Переданы не валидные данные для лайка' });
+    }
     if (error instanceof Error && error.name === 'NotFoundError') {
       return res.status(constants.HTTP_STATUS_NOT_FOUND).send({ message: 'Произошла ошибка' });
     }
