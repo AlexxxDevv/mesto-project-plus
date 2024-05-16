@@ -19,16 +19,9 @@ export const createUser = async (req: Request, res: Response) => {
 
 export const getUsers = async (req: Request, res: Response) => {
   try {
-    const users = await User.find({}).orFail(() => {
-      const error = new Error('Пользователь не найден');
-      error.name = 'NotFoundError';
-      return error;
-    });
+    const users = await User.find({});
     return res.send(users);
   } catch (error) {
-    if (error instanceof Error && error.name === 'NotFoundError') {
-      return res.status(constants.HTTP_STATUS_NOT_FOUND).send({ message: 'Произошла ошибка' });
-    }
     return res.status(constants.HTTP_STATUS_INTERNAL_SERVER_ERROR).send({ message: 'Произошла ошибка' });
   }
 };
@@ -52,28 +45,29 @@ export const getUserById = async (req: Request, res: Response) => {
   }
 };
 
-export const updateProfile = async (req: Request, res: Response) => {
-  const { name, about } = req.body;
+const updateUserData = async (req: Request, res: Response, data: any) => {
   try {
-    const user = await User.findByIdAndUpdate(res.locals.user._id, { name, about });
+    const user = await User.findByIdAndUpdate(res.locals.user._id, data, {
+      new: true,
+      runValidators: true,
+    });
     return res.send(user);
   } catch (error) {
-    if (error instanceof MongooseError.CastError) {
-      return res.status(constants.HTTP_STATUS_BAD_REQUEST).send({ message: 'Переданы невалидные данные' });
+    if (error instanceof MongooseError.ValidationError) {
+      return res.status(constants.HTTP_STATUS_BAD_REQUEST)
+        .send({ message: 'Переданы не валидные данные для установки аватара' });
     }
-    return res.status(constants.HTTP_STATUS_INTERNAL_SERVER_ERROR).send({ message: 'Произошла ошибка' });
+    return res.status(constants.HTTP_STATUS_INTERNAL_SERVER_ERROR)
+      .send({ message: 'Произошла ошибка' });
   }
 };
 
-export const updateAvatar = async (req: Request, res: Response) => {
+export const updateProfile = async (req: Request, res: Response) => {
+  const { name, about } = req.body;
+  updateUserData(req, res, { name, about });
+};
+
+export const updateAvatar = (req: Request, res: Response) => {
   const { avatar } = req.body;
-  try {
-    const user = await User.findByIdAndUpdate(res.locals.user._id, { avatar });
-    return res.send(user);
-  } catch (error) {
-    if (error instanceof MongooseError.CastError) {
-      return res.status(constants.HTTP_STATUS_BAD_REQUEST).send({ message: 'Переданы невалидные данные' });
-    }
-    return res.status(constants.HTTP_STATUS_INTERNAL_SERVER_ERROR).send({ message: 'Произошла ошибка' });
-  }
+  updateUserData(req, res, { avatar });
 };

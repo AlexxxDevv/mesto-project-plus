@@ -1,11 +1,9 @@
 import express, { Request, Response, NextFunction } from 'express';
 import mongoose from 'mongoose';
+import { constants } from 'http2';
 import { AuthContext } from './types/types';
-import userRouter from './routes/users';
-import cardRouter from './routes/cards';
-import updateProfileRouter from './routes/update-profile';
-import likesRouter from './routes/likes';
-// Слушаем 3000 порт
+import router from './routes/index';
+
 const { PORT = 3000 } = process.env;
 
 const app = express();
@@ -23,10 +21,10 @@ app.use((req: Request, res: Response<unknown, AuthContext>, next: NextFunction) 
   next();
 });
 
-app.use('/users', userRouter);
-app.use('/cards', cardRouter);
-app.use('/users/me', updateProfileRouter);
-app.use('/cards/:cardId/likes', likesRouter);
+app.use('/', router);
+app.get('*', (req: Request, res: Response) => {
+  res.status(constants.HTTP_STATUS_NOT_FOUND).send('Страница не найдена');
+});
 
 const connect = async () => {
   try {

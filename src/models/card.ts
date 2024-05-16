@@ -3,10 +3,9 @@ import mongoose from 'mongoose';
 type TCard = {
   name: string;
   link: string;
-//  owner: mongoose.Types.ObjectId;
-  owner: string;
+  owner: mongoose.Types.ObjectId;
   likes: mongoose.Types.ObjectId[];
-  createdAt: string;
+  createdAt: Date;
 }
 
 const cardSchema = new mongoose.Schema<TCard>({
@@ -20,13 +19,9 @@ const cardSchema = new mongoose.Schema<TCard>({
     type: String,
     required: true,
   },
-  /*   owner: {
+  owner: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'user',
-    required: true
-  }, */
-  owner: {
-    type: String,
     required: true,
   },
   likes: {
@@ -37,7 +32,8 @@ const cardSchema = new mongoose.Schema<TCard>({
     default: [],
   },
   createdAt: {
-    type: String,
+    type: Date,
+    default: Date.now,
   },
 }, {
   timestamps: true, // эта команда на создание полей createdAt и updatedAt

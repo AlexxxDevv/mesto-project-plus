@@ -19,16 +19,9 @@ export const createCard = async (req: Request, res: Response) => {
 
 export const getCards = async (req: Request, res: Response) => {
   try {
-    const cards = await Card.find({}).orFail(() => {
-      const error = new Error('Карточка не найдена');
-      error.name = 'NotFoundError';
-      return error;
-    });
+    const cards = await Card.find({});
     return res.send(cards);
   } catch (error) {
-    if (error instanceof Error && error.name === 'NotFoundError') {
-      return res.status(constants.HTTP_STATUS_NOT_FOUND).send({ message: 'Произошла ошибка' });
-    }
     return res.status(constants.HTTP_STATUS_INTERNAL_SERVER_ERROR).send({ message: 'Произошла ошибка' });
   }
 };
@@ -62,7 +55,7 @@ export const likeCard = async (req: Request, res: Response) => {
     });
     return res.send(card);
   } catch (error) {
-    if (error instanceof MongooseError.ValidationError) {
+    if (error instanceof MongooseError.CastError) {
       return res.status(constants.HTTP_STATUS_BAD_REQUEST).send({ message: 'Переданы не валидные данные для лайка' });
     }
     if (error instanceof Error && error.name === 'NotFoundError') {
@@ -85,7 +78,7 @@ export const dislikeCard = async (req: Request, res: Response) => {
     });
     return res.send(card);
   } catch (error) {
-    if (error instanceof MongooseError.ValidationError) {
+    if (error instanceof MongooseError.CastError) {
       return res.status(constants.HTTP_STATUS_BAD_REQUEST).send({ message: 'Переданы не валидные данные для лайка' });
     }
     if (error instanceof Error && error.name === 'NotFoundError') {
