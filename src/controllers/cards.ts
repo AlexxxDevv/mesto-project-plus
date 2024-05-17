@@ -35,6 +35,32 @@ export const deleteCardById = async (req: Request, res: Response) => {
     });
     return res.send(card);
   } catch (error) {
+    if (error instanceof MongooseError.CastError) {
+      return res.status(constants.HTTP_STATUS_BAD_REQUEST).send({ message: 'Переданы не валидные данные для удаления' });
+    }
+    if (error instanceof Error && error.name === 'NotFoundError') {
+      return res.status(constants.HTTP_STATUS_NOT_FOUND).send({ message: 'Произошла ошибка' });
+    }
+    return res.status(constants.HTTP_STATUS_INTERNAL_SERVER_ERROR).send({ message: 'Произошла ошибка' });
+  }
+};
+
+const changeCardData = async (req: Request, res: Response, option: any) => {
+  try {
+    const card = await Card.findByIdAndUpdate(
+      req.params.cardId,
+      option, // добавить _id в массив, если его там нет
+      { new: true },
+    ).orFail(() => {
+      const error = new Error('Карточка не найдена');
+      error.name = 'NotFoundError';
+      return error;
+    });
+    return res.send(card);
+  } catch (error) {
+    if (error instanceof MongooseError.CastError) {
+      return res.status(constants.HTTP_STATUS_BAD_REQUEST).send({ message: 'Переданы не валидные данные для лайка' });
+    }
     if (error instanceof Error && error.name === 'NotFoundError') {
       return res.status(constants.HTTP_STATUS_NOT_FOUND).send({ message: 'Произошла ошибка' });
     }
@@ -43,47 +69,11 @@ export const deleteCardById = async (req: Request, res: Response) => {
 };
 
 export const likeCard = async (req: Request, res: Response) => {
-  try {
-    const card = await Card.findByIdAndUpdate(
-      req.params.cardId,
-      { $addToSet: { likes: res.locals.user._id } }, // добавить _id в массив, если его там нет
-      { new: true },
-    ).orFail(() => {
-      const error = new Error('Карточка не найдена');
-      error.name = 'NotFoundError';
-      return error;
-    });
-    return res.send(card);
-  } catch (error) {
-    if (error instanceof MongooseError.CastError) {
-      return res.status(constants.HTTP_STATUS_BAD_REQUEST).send({ message: 'Переданы не валидные данные для лайка' });
-    }
-    if (error instanceof Error && error.name === 'NotFoundError') {
-      return res.status(constants.HTTP_STATUS_NOT_FOUND).send({ message: 'Произошла ошибка' });
-    }
-    return res.status(constants.HTTP_STATUS_INTERNAL_SERVER_ERROR).send({ message: 'Произошла ошибка' });
-  }
+  const option = { $addToSet: { likes: res.locals.user._id } };
+  changeCardData(req, res, option);
 };
 
 export const dislikeCard = async (req: Request, res: Response) => {
-  try {
-    const card = await Card.findByIdAndUpdate(
-      req.params.cardId,
-      { $pull: { likes: res.locals.user._id } },
-      { new: true },
-    ).orFail(() => {
-      const error = new Error('Карточка не найдена');
-      error.name = 'NotFoundError';
-      return error;
-    });
-    return res.send(card);
-  } catch (error) {
-    if (error instanceof MongooseError.CastError) {
-      return res.status(constants.HTTP_STATUS_BAD_REQUEST).send({ message: 'Переданы не валидные данные для лайка' });
-    }
-    if (error instanceof Error && error.name === 'NotFoundError') {
-      return res.status(constants.HTTP_STATUS_NOT_FOUND).send({ message: 'Произошла ошибка' });
-    }
-    return res.status(constants.HTTP_STATUS_INTERNAL_SERVER_ERROR).send({ message: 'Произошла ошибка' });
-  }
+  const option = { $pull: { likes: res.locals.user._id } };
+  changeCardData(req, res, option);
 };
