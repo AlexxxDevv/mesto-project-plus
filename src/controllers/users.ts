@@ -1,32 +1,73 @@
-import { Request, Response } from 'express';
+import { NextFunction, Request, Response } from 'express';
 import { constants } from 'http2';
 import { Error as MongooseError } from 'mongoose';
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
 import User from '../models/user';
+import ConflictError from '../error/conflict-error';
+import BadRequestError from '../error/bad-request-error';
+import NotFoundError from '../error/not-found-error';
 
-export const createUser = async (req: Request, res: Response) => {
-  const { name, about, avatar } = req.body;
+export const createUser = async (req: Request, res: Response, next: NextFunction) => {
+  const {
+    email, password, name, about, avatar,
+  } = req.body;
 
   try {
-    const user = await User.create({ name, about, avatar });
+    const hash = await bcrypt.hash(password, 10);
+    const user = await User.create({
+      email, password: hash, name, about, avatar,
+    });
     return res.status(constants.HTTP_STATUS_CREATED).send(user);
   } catch (error) {
-    if (error instanceof MongooseError.ValidationError) {
-      return res.status(constants.HTTP_STATUS_BAD_REQUEST).send({ message: 'Переданы не валидные данные для создания пользователя' });
+    if (error instanceof Error && error.message.startsWith('E11000')) {
+      return next(new ConflictError('Пользователь с такой почтой уже существует'));
     }
-    return res.status(constants.HTTP_STATUS_INTERNAL_SERVER_ERROR).send({ message: 'Произошла ошибка' });
+    if (error instanceof MongooseError.ValidationError) {
+      return next(new BadRequestError('Переданы не валидные данные для создания пользователя'));
+    }
+    return next(error);
   }
 };
 
-export const getUsers = async (req: Request, res: Response) => {
+export const login = async (req: Request, res: Response, next: NextFunction) => {
+  const { email, password } = req.body;
+  try {
+    const user = await User.findOne({ email }).select('+password'); // в случае аутентификации хеш пароля нужен. Чтобы это реализовать, после вызова метода модели, нужно добавить вызов метода select, передав ему строку +password
+    if (!user) {
+      const error = new Error('Неправильные почта или пароль');
+      error.name = 'NotAuthorized';
+      throw error;
+    }
+    const matched = await bcrypt.compare(password, user.password);
+    if (!matched) {
+      const error = new Error('Неправильные почта или пароль');
+      error.name = 'NotAuthorized';
+      throw error;
+    }
+    const token = jwt.sign({ _id: user._id }, 'some-secret-key');
+    return res.status(constants.HTTP_STATUS_ACCEPTED).cookie('jwt', token, {
+      maxAge: 3600000, // ms
+      httpOnly: true,
+    }).send(req.headers.cookie);
+  } catch (error: any) {
+    if (error instanceof Error && error.name === 'NotAuthorized') {
+      return next(new ConflictError('Неправильные почта или пароль'));
+    }
+    return next(error);
+  }
+};
+
+export const getUsers = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const users = await User.find({});
     return res.send(users);
   } catch (error) {
-    return res.status(constants.HTTP_STATUS_INTERNAL_SERVER_ERROR).send({ message: 'Произошла ошибка' });
+    return next(error);
   }
 };
 
-export const getUserById = async (req: Request, res: Response) => {
+export const getUserById = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = await User.findById(req.params.id).orFail(() => {
       const error = new Error('Пользователь не найден');
@@ -36,16 +77,16 @@ export const getUserById = async (req: Request, res: Response) => {
     return res.send(user);
   } catch (error) {
     if (error instanceof Error && error.name === 'NotFoundError') {
-      return res.status(constants.HTTP_STATUS_NOT_FOUND).send({ message: 'Произошла ошибка' });
+      return next(new NotFoundError('Такой пользователь не найден'));
     }
     if (error instanceof MongooseError.CastError) {
-      return res.status(constants.HTTP_STATUS_BAD_REQUEST).send({ message: 'Передан невалидный id пользователя' });
+      return next(new BadRequestError('Передан невалидный id пользователя'));
     }
-    return res.status(constants.HTTP_STATUS_INTERNAL_SERVER_ERROR).send({ message: 'Произошла ошибка' });
+    return next(error);
   }
 };
 
-const updateUserData = async (req: Request, res: Response, data: any) => {
+const updateUserData = async (req: Request, res: Response, next: NextFunction, data: any) => {
   try {
     const user = await User.findByIdAndUpdate(res.locals.user._id, data, {
       new: true,
@@ -54,20 +95,18 @@ const updateUserData = async (req: Request, res: Response, data: any) => {
     return res.send(user);
   } catch (error) {
     if (error instanceof MongooseError.ValidationError) {
-      return res.status(constants.HTTP_STATUS_BAD_REQUEST)
-        .send({ message: 'Переданы не валидные данные для установки аватара' });
+      return next(new BadRequestError('Переданы не валидные данные для обновления данных'));
     }
-    return res.status(constants.HTTP_STATUS_INTERNAL_SERVER_ERROR)
-      .send({ message: 'Произошла ошибка' });
+    return next(error);
   }
 };
 
-export const updateProfile = async (req: Request, res: Response) => {
+export const updateProfile = async (req: Request, res: Response, next: NextFunction) => {
   const { name, about } = req.body;
-  updateUserData(req, res, { name, about });
+  updateUserData(req, res, next, { name, about });
 };
 
-export const updateAvatar = (req: Request, res: Response) => {
+export const updateAvatar = (req: Request, res: Response, next: NextFunction) => {
   const { avatar } = req.body;
-  updateUserData(req, res, { avatar });
+  updateUserData(req, res, next, { avatar });
 };
