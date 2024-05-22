@@ -4,6 +4,7 @@ import { Error as MongooseError } from 'mongoose';
 import Card from '../models/card';
 import BadRequestError from '../error/bad-request-error';
 import NotFoundError from '../error/not-found-error';
+import ForbiddenError from '../error/forbidden';
 
 export const createCard = async (req: Request, res: Response, next: NextFunction) => {
   const { name, link } = req.body;
@@ -31,24 +32,22 @@ export const getCards = async (req: Request, res: Response, next: NextFunction) 
 export const deleteCardById = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const card = await Card.findById(req.params.cardId).orFail(() => {
-      const error = new Error('Карточка не найдена');
-      error.name = 'NotFoundError';
-      return error;
+      throw new NotFoundError('такая карточка не существует');
     });
     if (card.owner.toString() !== res.locals.user._id) {
-      const error = new Error('Нельзя удалить чужую карточку');
-      error.name = 'NotFoundError';
-      return error;
+      throw new ForbiddenError('Нельзя удалить чужую карточку');
     }
     await card.deleteOne();
-
     return res.send(card);
   } catch (error) {
+    if (error instanceof NotFoundError) {
+      return next(new NotFoundError('Такая карточка не существует'));
+    }
     if (error instanceof MongooseError.CastError) {
       return next(new BadRequestError('Переданы не валидные данные для удаления карточки'));
     }
-    if (error instanceof Error && error.name === 'NotFoundError') {
-      return next(new NotFoundError('Карточка не найдена'));
+    if (error instanceof ForbiddenError) {
+      return next(new ForbiddenError('Нельзя удалить чужую карточку'));
     }
     return next(error);
   }
@@ -61,17 +60,15 @@ const changeCardData = async (req: Request, res: Response, next: NextFunction, o
       option, // добавить _id в массив, если его там нет
       { new: true },
     ).orFail(() => {
-      const error = new Error('Карточка не найдена');
-      error.name = 'NotFoundError';
-      return error;
+      throw new NotFoundError('такая карточка не существует');
     });
     return res.send(card);
   } catch (error) {
     if (error instanceof MongooseError.CastError) {
       return next(new BadRequestError('Переданы не валидные данные для удаления карточки'));
     }
-    if (error instanceof Error && error.name === 'NotFoundError') {
-      return next(new NotFoundError('Карточка не найдена'));
+    if (error instanceof NotFoundError) {
+      return next(new NotFoundError('Такая карточка не существует'));
     }
     return next(error);
   }

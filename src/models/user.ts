@@ -41,7 +41,7 @@ const userSchema = new mongoose.Schema<TUser>({
     type: String,
     validate: {
       validator(v: string) {
-        return /[a-z0-9\-._~:\\/?#@!$&'()*+,;=]\.ru/.test(v);
+        return /[a-z0-9\-._~:\\/?#@!$&'()*+,;=]\.[a-z]{2,}/.test(v);
       },
       message: 'передайте правильный URL',
     },

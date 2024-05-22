@@ -1,12 +1,13 @@
-import express, { Request, Response } from 'express';
+import express from 'express';
 import mongoose from 'mongoose';
-import { constants } from 'http2';
 import { errors, Joi, celebrate } from 'celebrate';
+import helmet from 'helmet';
 import router from './routes/index';
 import { login, createUser } from './controllers/users';
 import auth from './middlewares/auth';
 import errorHandler from './middlewares/error-handler';
 import logger from './middlewares/logger';
+import NotFoundError from './error/not-found-error';
 
 const { PORT = 3000 } = process.env;
 
@@ -14,6 +15,8 @@ const app = express();
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+app.use(helmet());
 
 mongoose.connect('mongodb://localhost:27017/mestodb');
 
@@ -39,8 +42,8 @@ app.use(auth);
 
 app.use('/', router);
 
-app.get('*', (req: Request, res: Response) => {
-  res.status(constants.HTTP_STATUS_NOT_FOUND).send('Страница не найдена');
+app.use('*', (req, res, next) => {
+  next(new NotFoundError('Маршрут не найден'));
 });
 
 app.use(logger.errorLogger);

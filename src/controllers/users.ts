@@ -7,6 +7,7 @@ import User from '../models/user';
 import ConflictError from '../error/conflict-error';
 import BadRequestError from '../error/bad-request-error';
 import NotFoundError from '../error/not-found-error';
+import TokenError from '../error/token-error';
 
 export const createUser = async (req: Request, res: Response, next: NextFunction) => {
   const {
@@ -18,6 +19,7 @@ export const createUser = async (req: Request, res: Response, next: NextFunction
     const user = await User.create({
       email, password: hash, name, about, avatar,
     });
+    user.password = '###';
     return res.status(constants.HTTP_STATUS_CREATED).send(user);
   } catch (error) {
     if (error instanceof Error && error.message.startsWith('E11000')) {
@@ -35,15 +37,11 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
   try {
     const user = await User.findOne({ email }).select('+password'); // в случае аутентификации хеш пароля нужен. Чтобы это реализовать, после вызова метода модели, нужно добавить вызов метода select, передав ему строку +password
     if (!user) {
-      const error = new Error('Неправильные почта или пароль');
-      error.name = 'NotAuthorized';
-      throw error;
+      throw new TokenError('Неправильные почта или пароль');
     }
     const matched = await bcrypt.compare(password, user.password);
     if (!matched) {
-      const error = new Error('Неправильные почта или пароль');
-      error.name = 'NotAuthorized';
-      throw error;
+      throw new TokenError('Неправильные почта или пароль');
     }
     const token = jwt.sign({ _id: user._id }, 'some-secret-key');
     return res.status(constants.HTTP_STATUS_ACCEPTED).cookie('jwt', token, {
@@ -51,8 +49,8 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
       httpOnly: true,
     }).send(req.headers.cookie);
   } catch (error: any) {
-    if (error instanceof Error && error.name === 'NotAuthorized') {
-      return next(new ConflictError('Неправильные почта или пароль'));
+    if (error instanceof TokenError) {
+      return next(new TokenError('Неправильные почта или пароль'));
     }
     return next(error);
   }
@@ -70,17 +68,29 @@ export const getUsers = async (req: Request, res: Response, next: NextFunction) 
 export const getUserById = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = await User.findById(req.params.id).orFail(() => {
-      const error = new Error('Пользователь не найден');
-      error.name = 'NotFoundError';
-      return error;
+      throw new NotFoundError('Такой пользователь не найден');
     });
     return res.send(user);
   } catch (error) {
-    if (error instanceof Error && error.name === 'NotFoundError') {
+    if (error instanceof NotFoundError) {
       return next(new NotFoundError('Такой пользователь не найден'));
     }
     if (error instanceof MongooseError.CastError) {
       return next(new BadRequestError('Передан невалидный id пользователя'));
+    }
+    return next(error);
+  }
+};
+
+export const getUserByTken = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = await User.findById(res.locals.user._id).orFail(() => {
+      throw new NotFoundError('Такой пользователь не найден');
+    });
+    return res.send(user);
+  } catch (error) {
+    if (error instanceof NotFoundError) {
+      return next(new NotFoundError('Такой пользователь не найден'));
     }
     return next(error);
   }

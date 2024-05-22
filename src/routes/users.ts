@@ -2,7 +2,9 @@ import { Router } from 'express';
 import { Joi, celebrate } from 'celebrate';
 import {
   getUsers, getUserById, updateProfile, updateAvatar,
+  getUserByTken,
 } from '../controllers/users';
+import pattern from '../constants/constants';
 
 const router = Router();
 router.get('/', getUsers);
@@ -13,6 +15,8 @@ router.get('/:id', celebrate({
   }),
 }), getUserById);
 
+router.get('/me', getUserByTken);
+
 router.patch('/me', celebrate({
   body: Joi.object().keys({
     name: Joi.string().required().min(2).max(30),
@@ -22,7 +26,7 @@ router.patch('/me', celebrate({
 
 router.patch('/me/avatar', celebrate({
   body: Joi.object().keys({
-    avatar: Joi.string().required(),
+    avatar: Joi.string().regex(pattern).required(),
   }),
 }), updateAvatar);
 
