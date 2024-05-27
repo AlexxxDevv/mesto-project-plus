@@ -9,13 +9,13 @@ import pattern from '../constants/constants';
 const router = Router();
 router.get('/', getUsers);
 
+router.get('/me', getUserByTken);
+
 router.get('/:id', celebrate({
   params: Joi.object().keys({
     id: Joi.string().alphanum().length(24),
   }),
 }), getUserById);
-
-router.get('/me', getUserByTken);
 
 router.patch('/me', celebrate({
   body: Joi.object().keys({
